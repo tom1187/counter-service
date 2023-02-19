@@ -10,7 +10,7 @@ services:
       - counter_service_net
 
   counter-service:
-    image: ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
+    image: ${IMAGE}
     ports:
       - "80:80"
     depends_on:
