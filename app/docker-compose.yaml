@@ -10,7 +10,7 @@ services:
       - counter_service_net
 
   counter-service:
-    image: ${IMAGE}
+    image: placeholder_image
     ports:
       - "80:80"
     depends_on:
