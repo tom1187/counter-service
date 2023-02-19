@@ -15,7 +15,7 @@ logging.basicConfig(
 
 app = FastAPI()
 
-redis_host = os.getenv("REDIS_HOST", "0.0.0.0")
+redis_host = os.getenv("REDIS_HOST", "redis")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
 
 redis_client = None
