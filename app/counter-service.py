@@ -49,8 +49,9 @@ async def increment_counter():
 async def get_counter():
     counter = await redis_client.get("counter")
     if counter is None:
-        logging.warning("Counter not found")
-        return {"message": "Counter not found"}
+        logging.warning("Counter not found, setting to 0")
+        await redis_client.set("counter", 0)
+        return {"counter": 0}
     else:
         counter_value = int(counter)
         logging.info(f"Counter value is {counter_value}")
