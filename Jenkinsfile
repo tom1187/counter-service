@@ -1,33 +1,48 @@
 pipeline {
     agent any
-    parameters {
-        string(name: 'BRANCH_NAME', description: 'Name of the branch to build', defaultValue: 'main')
-    }
     environment {
-        SERVICE_NAME = 'counter-service'
-        IMAGE_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-        KUBECONFIG = '/var/lib/jenkins/.kube/config'
-        KUBE_NAMESPACE = 'default'
-        REPO_URL = 'https://github.com/tom1187/counter-service.git'
+        SERVICE_NAME = "counter-service"
+        BRANCH = "${env.BRANCH_NAME}".replace("/","_")
+        DOCKER_IMAGE_TAG = "${BRANCH}-${env.BUILD_NUMBER}"
+        DOCKER_REGISTRY = "tfrisz"
+        DOCKERFILE_PATH = "app"
+        DOCKER_REGISTRY_CREDENTIALS = 'dockerhub_creds'
+        REPO_URL = "https://github.com/tom1187/counter-service.git"
     }
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: "${params.BRANCH_NAME}"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: ${REPO_URL}]]])
+                checkout([$class: 'GitSCM', branches: [[name: "${params.BRANCH_NAME}"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: "${REPO_URL}"]]])
             }
         }
-        stage('Build image') {
+        stage('Build Docker Image') {
             steps {
-                sh "docker build -t tfirsz/${SERVICE_NAME}:${IMAGE_TAG} ."
-                sh "docker push tfirsz/${SERVICE_NAME}:${IMAGE_TAG}"
+                dir("${DOCKERFILE_PATH}"){
+                    sh "docker build -t ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG} -f Dockerfile ."
+                }
             }
         }
-        stage('Deploy to Kubernetes') {
+        stage('Push Docker Image') {
             steps {
-                sh "kubectl config use-context my-kubernetes-cluster"
-                sh "kubectl set image deployment/${SERVICE_NAME} ${SERVICE_NAME}=tfrisz/${SERVICE_NAME}:${IMAGE_TAG} -n ${KUBE_NAMESPACE}"
-                sh "kubectl rollout status deployment/${SERVICE_NAME} -n ${KUBE_NAMESPACE}"
+                dir("${DOCKERFILE_PATH}"){
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_REGISTRY_CREDENTIALS}", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                        sh "docker push ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}"
+                    }
+                }
+            }
+        }
+        stage('Deploy to Target Environment') {
+            steps {
+                dir("${DOCKERFILE_PATH}"){
+                    sh "docker pull ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}"
+                    sh "sed -i 's|\\'placeholder_image'|${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}|g' docker-compose.yaml"
+                    sh "cat docker-compose.yaml"
+                    sh 'docker-compose up -d'
+                }
             }
         }
     }
 }
+
+
