@@ -56,6 +56,3 @@ async def get_counter():
         counter_value = int(counter)
         logging.info(f"Counter value is {counter_value}")
         return {"counter": counter_value}
-
-# if __name__ == "__main__":
-#     uvicorn.run("counter-service:app", host="0.0.0.0", port=8000, reload=True)
