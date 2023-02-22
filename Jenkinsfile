@@ -69,15 +69,18 @@ pipeline {
         }
         stage('Deploy to Target Environment') {
             steps {
-                echo "Deploying ${SERVICE_NAME}:${DOCKER_IMAGE_TAG} to target environment"
-                sh """cat > docker_compose_env <<EOF
-                      REDIS_CONTAINER_NAME=redis_${DOCKER_IMAGE_TAG}
-                      COUNTER_SERVICE_CONTAINER_NAME=${SERVICE_NAME}_${DOCKER_IMAGE_TAG}
-                      COUNTER_SERVICE_IMAGE=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
-                      EOF
-                """
+                script {
+                    def dockerEnvContent = '''
+                    REDIS_CONTAINER_NAME=redis_${DOCKER_IMAGE_TAG}
+                    COUNTER_SERVICE_CONTAINER_NAME=${SERVICE_NAME}_${DOCKER_IMAGE_TAG}
+                    COUNTER_SERVICE_IMAGE=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
+                    '''
+                    writeFile file: 'docker_compose_env', text: dockerEnvContent
 
-                sh 'docker-compose up -d --env-file docker_compose_env'
+                    echo "Deploying ${SERVICE_NAME}:${DOCKER_IMAGE_TAG} to target environment"
+
+                    sh 'docker-compose up -d --env-file docker_compose_env'
+                }
             }
         }
     }
