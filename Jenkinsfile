@@ -9,7 +9,6 @@ pipeline {
         DOCKERFILE_PATH = "app"
         DOCKER_REGISTRY_CREDENTIALS = 'dockerhub_creds'
         REPO_URL = "https://github.com/tom1187/counter-service.git"
-        ref="refs/heads/feature/test1"
     }
     stages {
         stage('Process Webhook') {
