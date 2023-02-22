@@ -73,6 +73,7 @@ pipeline {
                     REDIS_CONTAINER_NAME=redis_${DOCKER_IMAGE_TAG}
                     COUNTER_SERVICE_CONTAINER_NAME=${SERVICE_NAME}_${DOCKER_IMAGE_TAG}
                     COUNTER_SERVICE_IMAGE=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
+                    COUNTER_DB_NAME=COUNTER_${DOCKER_IMAGE_TAG}
                     """
                     writeFile file: '.env', text: dockerEnvContent
 
