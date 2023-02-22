@@ -71,11 +71,11 @@ pipeline {
             steps {
                 echo "Deploying ${SERVICE_NAME}:${DOCKER_IMAGE_TAG} to target environment"
                 sh """cat > docker_compose_env <<EOF
-                            REDIS_CONTAINER_NAME=redis_${DOCKER_IMAGE_TAG}
-                            COUNTER_SERVICE_CONTAINER_NAME=${SERVICE_NAME}_${DOCKER_IMAGE_TAG}
-                            COUNTER_SERVICE_IMAGE=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
-                        EOF
-                    """
+                      REDIS_CONTAINER_NAME=redis_${DOCKER_IMAGE_TAG}
+                      COUNTER_SERVICE_CONTAINER_NAME=${SERVICE_NAME}_${DOCKER_IMAGE_TAG}
+                      COUNTER_SERVICE_IMAGE=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
+                      EOF
+                """
 
                 sh 'docker-compose up -d --env-file docker_compose_env'
             }
