@@ -2,11 +2,9 @@ version: "3.3"
 
 services:
   redis:
-    env_file:
-      - .env
     image: redis:latest
-    hostname: ${REDIS_CONTAINER_NAME}
-    container_name: ${REDIS_CONTAINER_NAME}
+    hostname: redis
+    container_name: redis
     ports:
       - "6379:6379"
     networks:
@@ -19,6 +17,7 @@ services:
     container_name: ${COUNTER_SERVICE_CONTAINER_NAME}
     environment:
       REDIS_HOST: ${REDIS_CONTAINER_NAME}
+      COUNTER_DB_NAME: ${COUNTER_DB_NAME}
     ports:
       - "80:80"
     depends_on:

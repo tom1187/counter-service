@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 
 app = FastAPI()
-
+counter_db_name = os.getenv("COUNTER_DB_NAME", "counter")
 redis_host = os.getenv("REDIS_HOST", "redis")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
 
@@ -38,17 +38,17 @@ async def shutdown_event():
 
 @app.post("/")
 async def increment_counter():
-    await redis_client.incr("counter")
+    await redis_client.incr(counter_db_name)
     logging.info("Counter incremented")
     return {"message": "Counter incremented"}
 
 
 @app.get("/")
 async def get_counter():
-    counter = await redis_client.get("counter")
+    counter = await redis_client.get(counter_db_name)
     if counter is None:
         logging.warning("Counter not found, setting to 0")
-        await redis_client.set("counter", 0)
+        await redis_client.set(counter_db_name, 0)
         return {"counter": 0}
     else:
         counter_value = int(counter)
