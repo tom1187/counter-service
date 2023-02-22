@@ -1,32 +1,86 @@
 pipeline {
     agent any
     parameters {
-        string(name: 'BRANCH_NAME', description: 'Name of the branch to build', defaultValue: 'main')
+        string(name: 'BRANCH_NAME', description: 'Name of the branch to build')
     }
     environment {
-        SERVICE_NAME = 'counter-service'
-        IMAGE_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-        KUBECONFIG = '/var/lib/jenkins/.kube/config'
-        KUBE_NAMESPACE = 'default'
-        REPO_URL = 'https://github.com/tom1187/counter-service.git'
+        SERVICE_NAME = "counter-service"
+        DOCKER_REGISTRY = "tfrisz"
+        DOCKERFILE_PATH = "app"
+        DOCKER_REGISTRY_CREDENTIALS = 'dockerhub_creds'
+        REPO_URL = "https://github.com/tom1187/counter-service.git"
+        ref="refs/heads/feature/test1"
     }
     stages {
+        stage('Process Webhook') {
+            when {
+                expression {env?.ref != null}
+            }
+            steps {
+                script {
+                    echo "Received webhook for branch: ${env.ref}"
+                    def branchName = "${env.ref}".replace('refs/heads/', '')
+                    env.BRANCH_NAME = branchName
+                    env.BRANCH = branchName.replace("/","_")
+                    env.DOCKER_IMAGE_TAG = "${BRANCH}-${env.BUILD_NUMBER}"
+                    echo "Using branch: ${branchName}."
+                    echo "env.BRANCH_NAM: ${env.BRANCH_NAM}"
+                }
+            }
+        }
+        stage('Process Manual Exec') {
+            when {
+                expression {"${params.BRANCH_NAME}" != ""}
+            }
+            steps {
+                script {
+                    echo "Received manual execution for branch: ${params.BRANCH_NAME}"
+                    env.BRANCH_NAME = "${params.BRANCH_NAME}"
+                    env.BRANCH = "${params.BRANCH_NAME}".replace("/","_")
+                    env.DOCKER_IMAGE_TAG = "${env.BRANCH}-${env.BUILD_NUMBER}"
+                    echo "Using branch: ${env.BRANCH_NAME}."
+                }
+            }
+        }
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: "${params.BRANCH_NAME}"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: ${REPO_URL}]]])
+                echo "Checking out code from ${REPO_URL} on branch ${env.BRANCH_NAME}"
+                checkout([$class: 'GitSCM', branches: [[name: "${env.BRANCH_NAME}"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: "${REPO_URL}"]]])
             }
         }
-        stage('Build image') {
+        stage('Build Docker Image') {
             steps {
-                sh "docker build -t tfirsz/${SERVICE_NAME}:${IMAGE_TAG} ."
-                sh "docker push tfirsz/${SERVICE_NAME}:${IMAGE_TAG}"
+                echo "Building Docker image for ${SERVICE_NAME}:${DOCKER_IMAGE_TAG}"
+                dir("${DOCKERFILE_PATH}"){
+                    sh "docker build -t ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG} -f Dockerfile ."
+                }
             }
         }
-        stage('Deploy to Kubernetes') {
+        stage('Push Docker Image') {
             steps {
-                sh "kubectl config use-context my-kubernetes-cluster"
-                sh "kubectl set image deployment/${SERVICE_NAME} ${SERVICE_NAME}=tfrisz/${SERVICE_NAME}:${IMAGE_TAG} -n ${KUBE_NAMESPACE}"
-                sh "kubectl rollout status deployment/${SERVICE_NAME} -n ${KUBE_NAMESPACE}"
+                echo "Pushing Docker image ${SERVICE_NAME}:${DOCKER_IMAGE_TAG} to ${DOCKER_REGISTRY}"
+                dir("${DOCKERFILE_PATH}"){
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_REGISTRY_CREDENTIALS}", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                        sh "docker push ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}"
+                    }
+                }
+            }
+        }
+        stage('Deploy to Target Environment') {
+            steps {
+                script {
+                    def dockerEnvContent = '''
+                    REDIS_CONTAINER_NAME=redis_${DOCKER_IMAGE_TAG}
+                    COUNTER_SERVICE_CONTAINER_NAME=${SERVICE_NAME}_${DOCKER_IMAGE_TAG}
+                    COUNTER_SERVICE_IMAGE=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_IMAGE_TAG}
+                    '''
+                    writeFile file: 'docker_compose_env', text: dockerEnvContent
+
+                    echo "Deploying ${SERVICE_NAME}:${DOCKER_IMAGE_TAG} to target environment"
+
+                    sh 'docker-compose up -d --env-file docker_compose_env'
+                }
             }
         }
     }
